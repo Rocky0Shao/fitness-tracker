@@ -1,5 +1,5 @@
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { doc, setDoc, getDoc, collection, query, orderBy, getDocs } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { doc, setDoc, getDoc, deleteDoc, collection, query, orderBy, getDocs } from 'firebase/firestore';
 import { storage, db } from './firebase';
 
 export interface PhotoEntry {
@@ -74,4 +74,59 @@ export async function getAllPhotoEntries(userId: string): Promise<PhotoEntry[]> 
   const querySnapshot = await getDocs(q);
 
   return querySnapshot.docs.map(doc => doc.data() as PhotoEntry);
+}
+
+export async function deletePhoto(
+  userId: string,
+  date: string,
+  type: 'front' | 'back'
+): Promise<void> {
+  if (!storage || !db) throw new Error('Firebase not initialized');
+
+  const storageRef = ref(storage, `photos/${userId}/${date}/${type}.jpg`);
+  try {
+    await deleteObject(storageRef);
+  } catch (error) {
+    console.warn('Photo file may not exist:', error);
+  }
+
+  const docRef = doc(db, 'users', userId, 'photos', date);
+  const existing = await getDoc(docRef);
+
+  if (existing.exists()) {
+    const data = existing.data();
+    const update: Partial<PhotoEntry> = {
+      [type === 'front' ? 'frontPhotoUrl' : 'backPhotoUrl']: null,
+      uploadedAt: new Date(),
+    };
+
+    const otherType = type === 'front' ? 'backPhotoUrl' : 'frontPhotoUrl';
+    if (!data[otherType]) {
+      await deleteDoc(docRef);
+    } else {
+      await setDoc(docRef, update, { merge: true });
+    }
+  }
+}
+
+export async function deletePhotoEntry(userId: string, date: string): Promise<void> {
+  if (!storage || !db) throw new Error('Firebase not initialized');
+
+  const frontRef = ref(storage, `photos/${userId}/${date}/front.jpg`);
+  const backRef = ref(storage, `photos/${userId}/${date}/back.jpg`);
+
+  try {
+    await deleteObject(frontRef);
+  } catch (error) {
+    console.warn('Front photo may not exist:', error);
+  }
+
+  try {
+    await deleteObject(backRef);
+  } catch (error) {
+    console.warn('Back photo may not exist:', error);
+  }
+
+  const docRef = doc(db, 'users', userId, 'photos', date);
+  await deleteDoc(docRef);
 }

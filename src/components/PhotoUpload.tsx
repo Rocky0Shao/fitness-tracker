@@ -1,20 +1,26 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
-import { uploadPhoto, savePhotoEntry, getTodayDate } from '@/lib/photoService';
+import { uploadPhoto, savePhotoEntry, getTodayDate, deletePhoto } from '@/lib/photoService';
 
 interface PhotoUploadProps {
   type: 'front' | 'back';
   existingUrl?: string | null;
   onUploadComplete: () => void;
+  date?: string;
 }
 
-export default function PhotoUpload({ type, existingUrl, onUploadComplete }: PhotoUploadProps) {
+export default function PhotoUpload({ type, existingUrl, onUploadComplete, date }: PhotoUploadProps) {
   const { user } = useAuth();
   const [preview, setPreview] = useState<string | null>(existingUrl || null);
   const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+
+  useEffect(() => {
+    setPreview(existingUrl || null);
+  }, [existingUrl]);
 
   const handleFile = useCallback(async (file: File) => {
     if (!user || !file.type.startsWith('image/')) return;
@@ -23,11 +29,11 @@ export default function PhotoUpload({ type, existingUrl, onUploadComplete }: Pho
     setUploading(true);
 
     try {
-      const date = getTodayDate();
-      const url = await uploadPhoto(user.uid, date, file, type);
+      const targetDate = date || getTodayDate();
+      const url = await uploadPhoto(user.uid, targetDate, file, type);
       await savePhotoEntry(
         user.uid,
-        date,
+        targetDate,
         type === 'front' ? url : null,
         type === 'back' ? url : null
       );
@@ -39,7 +45,7 @@ export default function PhotoUpload({ type, existingUrl, onUploadComplete }: Pho
     } finally {
       setUploading(false);
     }
-  }, [user, type, existingUrl, onUploadComplete]);
+  }, [user, type, existingUrl, onUploadComplete, date]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -53,7 +59,29 @@ export default function PhotoUpload({ type, existingUrl, onUploadComplete }: Pho
     if (file) handleFile(file);
   };
 
+  const handleDelete = useCallback(async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!user || !existingUrl) return;
+
+    const confirmed = window.confirm(`Delete this ${type} photo?`);
+    if (!confirmed) return;
+
+    setDeleting(true);
+    try {
+      const targetDate = date || getTodayDate();
+      await deletePhoto(user.uid, targetDate, type);
+      setPreview(null);
+      onUploadComplete();
+    } catch (error) {
+      console.error('Delete failed:', error);
+    } finally {
+      setDeleting(false);
+    }
+  }, [user, type, existingUrl, onUploadComplete, date]);
+
   const isUploaded = !!existingUrl;
+  const isProcessing = uploading || deleting;
 
   return (
     <div className="flex flex-col items-center gap-2">
@@ -66,7 +94,7 @@ export default function PhotoUpload({ type, existingUrl, onUploadComplete }: Pho
           flex items-center justify-center overflow-hidden transition-all
           ${dragOver ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'}
           ${isUploaded ? 'border-green-500 bg-green-50' : ''}
-          ${uploading ? 'opacity-50 pointer-events-none' : ''}
+          ${isProcessing ? 'opacity-50 pointer-events-none' : ''}
         `}
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
@@ -87,12 +115,23 @@ export default function PhotoUpload({ type, existingUrl, onUploadComplete }: Pho
           accept="image/*"
           onChange={handleChange}
           className="hidden"
-          disabled={uploading}
+          disabled={isProcessing}
         />
-        {uploading && (
+        {isProcessing && (
           <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
             <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
+        )}
+        {isUploaded && !isProcessing && (
+          <button
+            onClick={handleDelete}
+            className="absolute top-2 right-2 w-7 h-7 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center shadow-lg transition-colors"
+            title="Delete photo"
+          >
+            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
         )}
       </label>
       {isUploaded && (
