@@ -6,6 +6,7 @@ import { PhotoEntry } from '@/lib/photoService';
 interface ExerciseHeatmapProps {
   entries: PhotoEntry[];
   onDayClick: (date: string) => void;
+  onDayView?: (date: string) => void; // Navigate to view photos for this date
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -64,9 +65,22 @@ function getMonthLabels(year: number): { month: string; weekIndex: number }[] {
   return labels;
 }
 
-export default function ExerciseHeatmap({ entries, onDayClick }: ExerciseHeatmapProps) {
+export default function ExerciseHeatmap({ entries, onDayClick, onDayView }: ExerciseHeatmapProps) {
   const availableYears = useMemo(() => getYearsFromEntries(entries), [entries]);
   const [selectedYear, setSelectedYear] = useState(availableYears[0] || new Date().getFullYear());
+  const [hoveredDate, setHoveredDate] = useState<string | null>(null);
+
+  // Map of dates to photo counts
+  const datePhotoMap = useMemo(() => {
+    const map = new Map<string, { front: boolean; back: boolean }>();
+    entries.forEach(entry => {
+      map.set(entry.date, {
+        front: !!entry.frontPhotoUrl,
+        back: !!entry.backPhotoUrl,
+      });
+    });
+    return map;
+  }, [entries]);
 
   const workoutDates = useMemo(() => {
     const dates = new Set<string>();
@@ -77,6 +91,22 @@ export default function ExerciseHeatmap({ entries, onDayClick }: ExerciseHeatmap
     });
     return dates;
   }, [entries]);
+
+  const getPhotoCount = (date: string) => {
+    const info = datePhotoMap.get(date);
+    if (!info) return 0;
+    return (info.front ? 1 : 0) + (info.back ? 1 : 0);
+  };
+
+  const getTooltipText = (date: string) => {
+    const info = datePhotoMap.get(date);
+    if (!info) return `${date} - No photos`;
+    const count = (info.front ? 1 : 0) + (info.back ? 1 : 0);
+    const parts = [];
+    if (info.front) parts.push('Front');
+    if (info.back) parts.push('Back');
+    return `${date}: ${count} photo${count !== 1 ? 's' : ''} (${parts.join(', ')})`;
+  };
 
   const grid = useMemo(() => generateYearGrid(selectedYear), [selectedYear]);
   const monthLabels = useMemo(() => getMonthLabels(selectedYear), [selectedYear]);
@@ -146,21 +176,41 @@ export default function ExerciseHeatmap({ entries, onDayClick }: ExerciseHeatmap
                     const hasWorkout = workoutDates.has(dateStr);
                     const isFuture = dateStr > today;
                     const isToday = dateStr === today;
+                    const photoCount = getPhotoCount(dateStr);
+                    const isHovered = hoveredDate === dateStr;
 
                     return (
-                      <button
-                        key={dayIdx}
-                        onClick={() => !isFuture && onDayClick(dateStr)}
-                        disabled={isFuture}
-                        title={`${dateStr}${hasWorkout ? ' - Workout logged' : ''}`}
-                        className={`w-3 h-3 rounded-sm transition-all ${
-                          isFuture
-                            ? 'bg-gray-50 cursor-not-allowed'
-                            : hasWorkout
-                            ? 'bg-green-500 hover:bg-green-600 cursor-pointer'
-                            : 'bg-gray-200 hover:bg-gray-300 cursor-pointer'
-                        } ${isToday ? 'ring-1 ring-blue-500 ring-offset-1' : ''}`}
-                      />
+                      <div key={dayIdx} className="relative">
+                        <button
+                          onClick={() => {
+                            if (isFuture) return;
+                            if (hasWorkout && onDayView) {
+                              onDayView(dateStr);
+                            } else {
+                              onDayClick(dateStr);
+                            }
+                          }}
+                          onDoubleClick={() => !isFuture && onDayClick(dateStr)}
+                          onMouseEnter={() => setHoveredDate(dateStr)}
+                          onMouseLeave={() => setHoveredDate(null)}
+                          disabled={isFuture}
+                          className={`w-3 h-3 rounded-sm transition-all ${
+                            isFuture
+                              ? 'bg-gray-50 cursor-not-allowed'
+                              : hasWorkout
+                              ? photoCount === 2
+                                ? 'bg-green-500 hover:bg-green-600 cursor-pointer'
+                                : 'bg-green-300 hover:bg-green-400 cursor-pointer'
+                              : 'bg-gray-200 hover:bg-gray-300 cursor-pointer'
+                          } ${isToday ? 'ring-1 ring-blue-500 ring-offset-1' : ''}`}
+                        />
+                        {isHovered && !isFuture && (
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap z-50 pointer-events-none">
+                            {getTooltipText(dateStr)}
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+                          </div>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
@@ -179,7 +229,7 @@ export default function ExerciseHeatmap({ entries, onDayClick }: ExerciseHeatmap
       </div>
 
       <p className="text-xs text-gray-400 text-center mt-4">
-        Click any day to add or update photos
+        Click to view photos • Double-click to edit
       </p>
     </div>
   );

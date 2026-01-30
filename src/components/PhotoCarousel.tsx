@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, Pagination, Thumbs, FreeMode } from 'swiper/modules';
 import type { Swiper as SwiperType } from 'swiper';
 import { PhotoEntry } from '@/lib/photoService';
+import PrivacyImage from './PrivacyImage';
 import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/pagination';
@@ -13,6 +14,11 @@ import 'swiper/css/free-mode';
 
 interface PhotoCarouselProps {
   entries: PhotoEntry[];
+  initialDate?: string;
+}
+
+export interface PhotoCarouselHandle {
+  goToDate: (date: string) => void;
 }
 
 function formatDate(dateStr: string): string {
@@ -33,28 +39,54 @@ function formatShortDate(dateStr: string): string {
   });
 }
 
-export default function PhotoCarousel({ entries }: PhotoCarouselProps) {
-  const [thumbsSwiper, setThumbsSwiper] = useState<SwiperType | null>(null);
+const PhotoCarousel = forwardRef<PhotoCarouselHandle, PhotoCarouselProps>(
+  function PhotoCarousel({ entries, initialDate }, ref) {
+    const [thumbsSwiper, setThumbsSwiper] = useState<SwiperType | null>(null);
+    const [mainSwiper, setMainSwiper] = useState<SwiperType | null>(null);
 
-  if (entries.length === 0) {
+    // Navigate to a specific date
+    const goToDate = (date: string) => {
+      const index = entries.findIndex((e) => e.date === date);
+      if (index !== -1 && mainSwiper) {
+        mainSwiper.slideTo(index);
+      }
+    };
+
+    // Expose goToDate via ref
+    useImperativeHandle(ref, () => ({
+      goToDate,
+    }));
+
+    // Navigate to initial date on mount
+    useEffect(() => {
+      if (initialDate && mainSwiper) {
+        const index = entries.findIndex((e) => e.date === initialDate);
+        if (index !== -1) {
+          mainSwiper.slideTo(index);
+        }
+      }
+    }, [initialDate, mainSwiper, entries]);
+
+    if (entries.length === 0) {
+      return (
+        <div className="text-center py-8 text-gray-500">
+          <p className="text-sm">No photos yet. Start tracking today!</p>
+        </div>
+      );
+    }
+
     return (
-      <div className="text-center py-8 text-gray-500">
-        <p className="text-sm">No photos yet. Start tracking today!</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-3">
-      <Swiper
-        modules={[Navigation, Pagination, Thumbs]}
-        navigation
-        pagination={{ clickable: true }}
-        thumbs={{ swiper: thumbsSwiper && !thumbsSwiper.destroyed ? thumbsSwiper : null }}
-        spaceBetween={16}
-        slidesPerView={1}
-        className="w-full"
-      >
+      <div className="flex flex-col gap-3">
+        <Swiper
+          onSwiper={setMainSwiper}
+          modules={[Navigation, Pagination, Thumbs]}
+          navigation
+          pagination={{ clickable: true }}
+          thumbs={{ swiper: thumbsSwiper && !thumbsSwiper.destroyed ? thumbsSwiper : null }}
+          spaceBetween={16}
+          slidesPerView={1}
+          className="w-full"
+        >
         {entries.map((entry) => (
           <SwiperSlide key={entry.date}>
             <div className="pb-2">
@@ -64,7 +96,7 @@ export default function PhotoCarousel({ entries }: PhotoCarouselProps) {
               <div className="flex gap-3 justify-center">
                 <div className="relative">
                   {entry.frontPhotoUrl ? (
-                    <img
+                    <PrivacyImage
                       src={entry.frontPhotoUrl}
                       alt="Front view"
                       className="w-28 h-36 object-cover rounded-lg shadow-sm"
@@ -78,7 +110,7 @@ export default function PhotoCarousel({ entries }: PhotoCarouselProps) {
                 </div>
                 <div className="relative">
                   {entry.backPhotoUrl ? (
-                    <img
+                    <PrivacyImage
                       src={entry.backPhotoUrl}
                       alt="Back view"
                       className="w-28 h-36 object-cover rounded-lg shadow-sm"
@@ -110,7 +142,7 @@ export default function PhotoCarousel({ entries }: PhotoCarouselProps) {
           <SwiperSlide key={entry.date} className="!w-12">
             <div className="cursor-pointer group">
               {entry.frontPhotoUrl ? (
-                <img
+                <PrivacyImage
                   src={entry.frontPhotoUrl}
                   alt={formatShortDate(entry.date)}
                   className="w-12 h-16 object-cover rounded border-2 border-transparent group-[.swiper-slide-thumb-active]:border-blue-500 transition-all"
@@ -128,4 +160,6 @@ export default function PhotoCarousel({ entries }: PhotoCarouselProps) {
       </Swiper>
     </div>
   );
-}
+});
+
+export default PhotoCarousel;

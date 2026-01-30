@@ -9,14 +9,16 @@ interface PhotoUploadProps {
   existingUrl?: string | null;
   onUploadComplete: () => void;
   date?: string;
+  ghostOverlayUrl?: string | null; // Previous photo for alignment
 }
 
-export default function PhotoUpload({ type, existingUrl, onUploadComplete, date }: PhotoUploadProps) {
+export default function PhotoUpload({ type, existingUrl, onUploadComplete, date, ghostOverlayUrl }: PhotoUploadProps) {
   const { user } = useAuth();
   const [preview, setPreview] = useState<string | null>(existingUrl || null);
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [showGhost, setShowGhost] = useState(true);
 
   useEffect(() => {
     setPreview(existingUrl || null);
@@ -82,12 +84,29 @@ export default function PhotoUpload({ type, existingUrl, onUploadComplete, date 
 
   const isUploaded = !!existingUrl;
   const isProcessing = uploading || deleting;
+  const hasGhostOverlay = ghostOverlayUrl && !preview && showGhost;
 
   return (
     <div className="flex flex-col items-center gap-2">
-      <span className="text-sm font-medium text-gray-600 uppercase tracking-wide">
-        {type} View
-      </span>
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-medium text-gray-600 uppercase tracking-wide">
+          {type} View
+        </span>
+        {ghostOverlayUrl && !preview && (
+          <button
+            onClick={() => setShowGhost(!showGhost)}
+            className={`p-1 rounded transition-colors ${
+              showGhost ? 'text-blue-500 bg-blue-50' : 'text-gray-400 hover:text-gray-600'
+            }`}
+            title={showGhost ? 'Hide alignment guide' : 'Show alignment guide'}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+          </button>
+        )}
+      </div>
       <label
         className={`
           relative w-40 h-52 rounded-xl border-2 border-dashed cursor-pointer
@@ -100,14 +119,25 @@ export default function PhotoUpload({ type, existingUrl, onUploadComplete, date 
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
       >
+        {/* Ghost Overlay for Alignment */}
+        {hasGhostOverlay && (
+          <img
+            src={ghostOverlayUrl}
+            alt="Alignment guide"
+            className="absolute inset-0 w-full h-full object-cover opacity-30 pointer-events-none"
+          />
+        )}
+
         {preview ? (
           <img src={preview} alt={`${type} view`} className="w-full h-full object-cover" />
         ) : (
-          <div className="text-center p-4">
+          <div className="text-center p-4 relative z-10">
             <svg className="w-8 h-8 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
             </svg>
-            <span className="text-xs text-gray-500">Drop or tap</span>
+            <span className="text-xs text-gray-500">
+              {hasGhostOverlay ? 'Align & upload' : 'Drop or tap'}
+            </span>
           </div>
         )}
         <input
@@ -118,14 +148,14 @@ export default function PhotoUpload({ type, existingUrl, onUploadComplete, date 
           disabled={isProcessing}
         />
         {isProcessing && (
-          <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+          <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-20">
             <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
         )}
         {isUploaded && !isProcessing && (
           <button
             onClick={handleDelete}
-            className="absolute top-2 right-2 w-7 h-7 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center shadow-lg transition-colors"
+            className="absolute top-2 right-2 w-7 h-7 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center shadow-lg transition-colors z-20"
             title="Delete photo"
           >
             <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -136,6 +166,9 @@ export default function PhotoUpload({ type, existingUrl, onUploadComplete, date 
       </label>
       {isUploaded && (
         <span className="text-xs text-green-600 font-medium">Uploaded</span>
+      )}
+      {hasGhostOverlay && (
+        <span className="text-xs text-blue-500">Alignment guide active</span>
       )}
     </div>
   );

@@ -1,23 +1,35 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from '@/lib/AuthContext';
+import { usePrivacy } from '@/lib/PrivacyContext';
 import LoginButton from '@/components/LoginButton';
 import PhotoUpload from '@/components/PhotoUpload';
-import PhotoCarousel from '@/components/PhotoCarousel';
+import PhotoCarousel, { PhotoCarouselHandle } from '@/components/PhotoCarousel';
 import ExerciseHeatmap from '@/components/ExerciseHeatmap';
 import UploadModal from '@/components/UploadModal';
 import ShareManager from '@/components/ShareManager';
+import ComparisonModal from '@/components/ComparisonModal';
+import PrivacyImage from '@/components/PrivacyImage';
 import { PhotoEntry, getTodayDate, getPhotoEntry, getAllPhotoEntries } from '@/lib/photoService';
 
 export default function Home() {
   const { user, loading, logout } = useAuth();
+  const { blurEnabled, toggleBlur } = usePrivacy();
   const [todayEntry, setTodayEntry] = useState<PhotoEntry | null>(null);
   const [allEntries, setAllEntries] = useState<PhotoEntry[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalDate, setModalDate] = useState<string>('');
   const [modalEntry, setModalEntry] = useState<PhotoEntry | null>(null);
   const [shareExpanded, setShareExpanded] = useState(false);
+  const [comparisonOpen, setComparisonOpen] = useState(false);
+  const carouselRef = useRef<PhotoCarouselHandle>(null);
+
+  // Get the most recent photo for ghost overlay alignment
+  const ghostOverlayEntry = useMemo(() => {
+    // Return the most recent entry that has photos (excluding today if empty)
+    return allEntries.find(e => e.frontPhotoUrl || e.backPhotoUrl) || null;
+  }, [allEntries]);
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -37,6 +49,15 @@ export default function Home() {
     setModalEntry(entry);
     setModalOpen(true);
   }, [user]);
+
+  // Navigate carousel to view photos for a specific date
+  const handleDayView = useCallback((date: string) => {
+    if (carouselRef.current) {
+      carouselRef.current.goToDate(date);
+      // Scroll the history section into view
+      document.getElementById('history-section')?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, []);
 
   const handleModalClose = useCallback(() => {
     setModalOpen(false);
@@ -80,7 +101,37 @@ export default function Home() {
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <h1 className="text-xl font-bold text-gray-800">Fitness Tracker</h1>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-600">{user.displayName}</span>
+            {/* Privacy Blur Toggle */}
+            <button
+              onClick={toggleBlur}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                blurEnabled
+                  ? 'bg-purple-100 text-purple-700'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+              title={blurEnabled ? 'Privacy mode on - hover to reveal' : 'Enable privacy mode'}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {blurEnabled ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                )}
+              </svg>
+              <span className="hidden sm:inline">{blurEnabled ? 'Private' : 'Privacy'}</span>
+            </button>
+            {/* Compare Button */}
+            <button
+              onClick={() => setComparisonOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
+              title="Compare progress photos"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+              </svg>
+              <span className="hidden sm:inline">Compare</span>
+            </button>
+            <span className="text-sm text-gray-600 hidden sm:inline">{user.displayName}</span>
             <button
               onClick={logout}
               className="text-sm text-gray-500 hover:text-gray-700"
@@ -110,7 +161,7 @@ export default function Home() {
                 </p>
                 <div className="flex gap-3 justify-center">
                   <div className="relative">
-                    <img
+                    <PrivacyImage
                       src={todayEntry.frontPhotoUrl!}
                       alt="Front"
                       className="w-28 h-36 object-cover rounded-lg shadow"
@@ -118,7 +169,7 @@ export default function Home() {
                     <span className="absolute bottom-1 left-1 text-[10px] bg-black/50 text-white px-1.5 py-0.5 rounded">Front</span>
                   </div>
                   <div className="relative">
-                    <img
+                    <PrivacyImage
                       src={todayEntry.backPhotoUrl!}
                       alt="Back"
                       className="w-28 h-36 object-cover rounded-lg shadow"
@@ -133,27 +184,33 @@ export default function Home() {
                   type="front"
                   existingUrl={todayEntry?.frontPhotoUrl}
                   onUploadComplete={loadData}
+                  ghostOverlayUrl={ghostOverlayEntry?.frontPhotoUrl}
                 />
                 <PhotoUpload
                   type="back"
                   existingUrl={todayEntry?.backPhotoUrl}
                   onUploadComplete={loadData}
+                  ghostOverlayUrl={ghostOverlayEntry?.backPhotoUrl}
                 />
               </div>
             )}
           </div>
 
           {/* History Carousel */}
-          <div className="bg-white rounded-2xl shadow-lg p-6">
+          <div id="history-section" className="bg-white rounded-2xl shadow-lg p-6">
             <h2 className="text-center text-lg font-semibold text-gray-800 mb-4">
               History ({allEntries.length} days)
             </h2>
-            <PhotoCarousel entries={allEntries} />
+            <PhotoCarousel ref={carouselRef} entries={allEntries} />
           </div>
         </div>
 
         {/* Row 2: Activity Heatmap */}
-        <ExerciseHeatmap entries={allEntries} onDayClick={handleDayClick} />
+        <ExerciseHeatmap
+          entries={allEntries}
+          onDayClick={handleDayClick}
+          onDayView={handleDayView}
+        />
 
         {/* Row 3: Share Manager (Collapsible) */}
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
@@ -183,8 +240,15 @@ export default function Home() {
         isOpen={modalOpen}
         date={modalDate}
         existingEntry={modalEntry}
+        ghostOverlayEntry={ghostOverlayEntry}
         onClose={handleModalClose}
         onUploadComplete={handleModalUploadComplete}
+      />
+
+      <ComparisonModal
+        isOpen={comparisonOpen}
+        entries={allEntries}
+        onClose={() => setComparisonOpen(false)}
       />
     </div>
   );

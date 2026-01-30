@@ -8,6 +8,7 @@ interface UploadModalProps {
   isOpen: boolean;
   date: string;
   existingEntry: PhotoEntry | null;
+  ghostOverlayEntry?: PhotoEntry | null; // For alignment guide
   onClose: () => void;
   onUploadComplete: () => void;
 }
@@ -26,6 +27,7 @@ export default function UploadModal({
   isOpen,
   date,
   existingEntry,
+  ghostOverlayEntry,
   onClose,
   onUploadComplete,
 }: UploadModalProps) {
@@ -83,12 +85,14 @@ export default function UploadModal({
             date={date}
             existingUrl={existingEntry?.frontPhotoUrl}
             onUploadComplete={onUploadComplete}
+            ghostOverlayUrl={ghostOverlayEntry?.frontPhotoUrl}
           />
           <PhotoUpload
             type="back"
             date={date}
             existingUrl={existingEntry?.backPhotoUrl}
             onUploadComplete={onUploadComplete}
+            ghostOverlayUrl={ghostOverlayEntry?.backPhotoUrl}
           />
         </div>
 
