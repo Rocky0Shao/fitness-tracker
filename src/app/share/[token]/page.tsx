@@ -325,8 +325,14 @@ export default function SharePage({ params }: { params: Promise<{ token: string 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <header className="bg-white shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <h1 className="text-xl font-bold text-gray-800">Shared Fitness Progress</h1>
+        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+          <h1 className="text-xl font-bold text-gray-800">FitSnap</h1>
+          <a
+            href="/"
+            className="px-4 py-2 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            Start Your Journey
+          </a>
         </div>
       </header>
 
@@ -395,8 +401,17 @@ export default function SharePage({ params }: { params: Promise<{ token: string 
         )}
       </main>
 
-      <footer className="text-center py-4 text-sm text-gray-400">
-        Shared via Fitness Tracker
+      <footer className="text-center py-8">
+        <p className="text-sm text-gray-400 mb-3">Shared via FitSnap</p>
+        <a
+          href="/"
+          className="inline-flex items-center gap-2 text-blue-500 hover:text-blue-600 font-medium"
+        >
+          <span>Create your own fitness diary</span>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+          </svg>
+        </a>
       </footer>
     </div>
   );

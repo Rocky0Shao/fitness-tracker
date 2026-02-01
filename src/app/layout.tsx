@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Fitness Progress Tracker",
-  description: "Track your fitness journey with daily progress photos",
+  title: "FitSnap - Daily Fitness Photo Diary",
+  description: "Capture your fitness transformation one photo at a time. Upload daily progress photos, track your journey, and share your results.",
 };
 
 export default function RootLayout({
