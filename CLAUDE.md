@@ -44,9 +44,15 @@ npm run lint     # Lint code
 
 - **PhotoUpload** - Handles drag-drop upload with ghost overlay from previous photo for alignment
 - **PhotoCarousel** - Swiper-based carousel with thumbnail scrubber, exposes `goToDate()` via ref
-- **ExerciseHeatmap** - GitHub-style activity heatmap showing workout days
+- **ExerciseHeatmap** - GitHub-style activity heatmap with:
+  - All 7 day labels (Sun-Sat) aligned with grid rows using explicit 12px heights and flexbox centering
+  - Workout count in header: "Exercise Activity (X Days)"
+  - Previous year always available for retroactive uploads
+  - Click to view photos, double-click to edit
 - **ComparisonSlider** - Before/after photo comparison with draggable divider
 - **PrivacyImage** - Wrapper that applies blur based on PrivacyContext
+- **ShareManager** - UI for enabling/disabling share links and setting permissions
+- **UploadModal** - Modal for uploading photos to past dates (opened from heatmap clicks)
 
 ## Firestore Schema
 
@@ -82,3 +88,28 @@ NEXT_PUBLIC_FIREBASE_APP_ID
 FIREBASE_CLIENT_EMAIL
 FIREBASE_PRIVATE_KEY
 ```
+
+## Share Link Functionality
+
+The share feature allows users to share their progress via a public URL:
+
+1. **Enable sharing** in the "Share Your Progress" section
+2. **Configure permissions**: activity heatmap and/or photos
+3. **Copy the link** to share with others
+
+The share API (`/api/share/[token]`) uses Firebase Admin SDK, which requires `FIREBASE_CLIENT_EMAIL` and `FIREBASE_PRIVATE_KEY` to be set.
+
+## Deployment (Vercel)
+
+1. Connect your GitHub repo to Vercel
+2. Add all environment variables in Vercel dashboard (Settings → Environment Variables)
+3. For `FIREBASE_PRIVATE_KEY`, use the single-line format with `\n` escape sequences:
+   ```
+   -----BEGIN PRIVATE KEY-----\nMIIEv...\n-----END PRIVATE KEY-----\n
+   ```
+4. Deploy
+
+## Known Issues & Solutions
+
+- **Heatmap label alignment**: Uses explicit 12px heights and 4px gaps with flexbox centering to ensure day labels align with grid rows
+- **Share link not working**: Ensure `FIREBASE_CLIENT_EMAIL` and `FIREBASE_PRIVATE_KEY` are set correctly (check for whitespace issues in private key)
