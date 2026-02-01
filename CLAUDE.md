@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Fitness tracking web application for daily progress photos. Users upload two photos per day (front and back views) to track their fitness journey over time.
+**FitSnap** - A daily fitness photo diary web application. Users upload two photos per day (front and back views) to track their fitness transformation over time.
 
 ## Tech Stack
 

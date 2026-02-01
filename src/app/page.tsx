@@ -107,7 +107,7 @@ export default function Home() {
             </p>
 
             {/* Login Button */}
-            <div className="mb-12">
+            <div className="mb-12 flex justify-center">
               <LoginButton />
             </div>
 
