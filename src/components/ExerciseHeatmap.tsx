@@ -14,7 +14,8 @@ const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 function getYearsFromEntries(entries: PhotoEntry[]): number[] {
   const currentYear = new Date().getFullYear();
-  const years = new Set<number>([currentYear]);
+  // Always include current year and previous year for retroactive uploads
+  const years = new Set<number>([currentYear, currentYear - 1]);
   entries.forEach(entry => {
     const year = new Date(entry.date).getFullYear();
     years.add(year);
@@ -116,7 +117,9 @@ export default function ExerciseHeatmap({ entries, onDayClick, onDayView }: Exer
   return (
     <div className="bg-white rounded-2xl shadow-lg p-6">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-lg font-semibold text-gray-800">Exercise Activity</h2>
+        <h2 className="text-lg font-semibold text-gray-800">
+          Exercise Activity ({workoutDates.size} Day{workoutDates.size !== 1 ? 's' : ''})
+        </h2>
         <div className="flex gap-2">
           {availableYears.map(year => (
             <button
@@ -134,9 +137,10 @@ export default function ExerciseHeatmap({ entries, onDayClick, onDayView }: Exer
         </div>
       </div>
 
-      <div className="overflow-x-auto scrollbar-hide">
-        <div className="inline-block">
-          <div className="flex gap-1 mb-1 ml-8">
+      <div className="relative">
+        <div className="overflow-x-auto scrollbar-hide">
+          <div className="inline-block pt-10 pb-2">
+            <div className="flex mb-1" style={{ paddingLeft: '30px', gap: '4px' }}>
             {monthLabels.map(({ month, weekIndex }, idx) => {
               const nextWeekIndex = monthLabels[idx + 1]?.weekIndex ?? grid[0].length;
               const span = nextWeekIndex - weekIndex;
@@ -152,25 +156,26 @@ export default function ExerciseHeatmap({ entries, onDayClick, onDayView }: Exer
             })}
           </div>
 
-          <div className="flex gap-1">
-            <div className="flex flex-col gap-1 mr-1">
-              {DAYS.map((day, idx) => (
+          <div className="flex">
+            <div className="flex flex-col" style={{ gap: '4px', width: '22px', marginRight: '8px' }}>
+              {DAYS.map((day) => (
                 <div
                   key={day}
-                  className="h-3 text-[10px] text-gray-400 leading-3 text-right pr-1"
+                  className="flex items-center justify-end text-[10px] text-gray-400"
+                  style={{ height: '12px' }}
                 >
-                  {idx % 2 === 1 ? day : ''}
+                  {day}
                 </div>
               ))}
             </div>
 
-            <div className="flex gap-1">
+            <div className="flex" style={{ gap: '4px' }}>
               {Array.from({ length: grid[0].length }, (_, weekIdx) => (
-                <div key={weekIdx} className="flex flex-col gap-1">
+                <div key={weekIdx} className="flex flex-col" style={{ gap: '4px' }}>
                   {grid.map((row, dayIdx) => {
                     const dateStr = row[weekIdx];
                     if (!dateStr) {
-                      return <div key={dayIdx} className="w-3 h-3" />;
+                      return <div key={dayIdx} style={{ width: '12px', height: '12px' }} />;
                     }
 
                     const hasWorkout = workoutDates.has(dateStr);
@@ -180,7 +185,7 @@ export default function ExerciseHeatmap({ entries, onDayClick, onDayView }: Exer
                     const isHovered = hoveredDate === dateStr;
 
                     return (
-                      <div key={dayIdx} className="relative">
+                      <div key={dayIdx} className="relative" style={{ width: '12px', height: '12px' }}>
                         <button
                           onClick={() => {
                             if (isFuture) return;
@@ -194,7 +199,8 @@ export default function ExerciseHeatmap({ entries, onDayClick, onDayView }: Exer
                           onMouseEnter={() => setHoveredDate(dateStr)}
                           onMouseLeave={() => setHoveredDate(null)}
                           disabled={isFuture}
-                          className={`w-3 h-3 rounded-sm transition-all ${
+                          style={{ width: '12px', height: '12px' }}
+                          className={`rounded-sm transition-all ${
                             isFuture
                               ? 'bg-gray-50 cursor-not-allowed'
                               : hasWorkout
@@ -216,6 +222,7 @@ export default function ExerciseHeatmap({ entries, onDayClick, onDayView }: Exer
                 </div>
               ))}
             </div>
+          </div>
           </div>
         </div>
       </div>

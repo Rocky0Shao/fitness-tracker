@@ -8,82 +8,77 @@ Fitness tracking web application for daily progress photos. Users upload two pho
 
 ## Tech Stack
 
-- **Framework**: Next.js
+- **Framework**: Next.js 16 (App Router)
 - **Auth**: Firebase Authentication (Google Sign-In)
-- **Database**: Firebase Firestore (track photo metadata and dates)
-- **Storage**: Firebase Storage (store photos)
-- **Deployment**: Vercel
-- **Styling**: TBD (Tailwind CSS recommended)
+- **Database**: Firebase Firestore
+- **Storage**: Firebase Storage
+- **Styling**: Tailwind CSS 4
+- **UI**: Swiper for carousels
 
 ## Build Commands
 
 ```bash
-npm install          # Install dependencies
-npm run dev          # Start development server (localhost:3000)
-npm run build        # Production build
-npm run lint         # Lint code
+npm run dev      # Start development server (localhost:3000)
+npm run build    # Production build
+npm run lint     # Lint code
 ```
 
-## Project Structure
+## Architecture
 
-```
-src/
-├── app/
-│   ├── layout.tsx      # Root layout with AuthProvider
-│   ├── page.tsx        # Main page (login, upload, history views)
-│   └── globals.css     # Global styles
-├── components/
-│   ├── LoginButton.tsx # Google sign-in button
-│   ├── PhotoUpload.tsx # Drag-drop photo upload (front/back)
-│   └── PhotoCarousel.tsx # Swiper-based horizontal carousel
-└── lib/
-    ├── firebase.ts     # Firebase app initialization
-    ├── AuthContext.tsx # Auth state management
-    └── photoService.ts # Firestore/Storage operations
-```
+### Data Flow
 
-## Core Requirements
+1. **AuthContext** (`src/lib/AuthContext.tsx`) - Wraps app, provides `user`, `loading`, `signInWithGoogle`, `logout`
+2. **PrivacyContext** (`src/lib/PrivacyContext.tsx`) - Controls privacy blur state for images
+3. **photoService** (`src/lib/photoService.ts`) - All Firestore/Storage CRUD for photos
+4. **shareService** (`src/lib/shareService.ts`) - Manages shareable links with permissions
 
-1. **Google Login**: Users authenticate via Google account
-2. **Daily Photo Upload**: Exactly 2 photos per day (front view + back view)
-3. **Enforced Limit**: Cannot upload more than one front + one back per day
-4. **Timeline Browse**: Users can scroll/swipe through past days to see progress
-5. **Progress Tracking**: Visual indication of which days have photos (workout days)
-6. **Private**: Each user only sees their own photos
+### Key Patterns
 
-## User Flow
+- All components use `'use client'` directive (client-side rendering with Firebase)
+- Photos stored as `photos/{userId}/{date}/front.jpg` and `back.jpg` in Firebase Storage
+- Firestore path: `users/{userId}/photos/{date}` with `frontPhotoUrl`, `backPhotoUrl`, `uploadedAt`
+- Share links stored in both `shareLinks/{token}` (global lookup) and `users/{userId}/settings/shareLink`
+- API route at `/api/share/[token]` uses Firebase Admin SDK for server-side data access
 
-1. User logs in with Google
-2. Lands on today's upload screen (or timeline if already uploaded today)
-3. Can upload front photo + back photo for today
-4. Can browse past days to see their progress
-5. Scrolling through days shows fitness progression over time
+### Component Responsibilities
 
-## UI Design
+- **PhotoUpload** - Handles drag-drop upload with ghost overlay from previous photo for alignment
+- **PhotoCarousel** - Swiper-based carousel with thumbnail scrubber, exposes `goToDate()` via ref
+- **ExerciseHeatmap** - GitHub-style activity heatmap showing workout days
+- **ComparisonSlider** - Before/after photo comparison with draggable divider
+- **PrivacyImage** - Wrapper that applies blur based on PrivacyContext
 
-- **Navigation**: Horizontal swipe carousel (like Stories) to browse through days
-- **Privacy**: Private-only (no sharing/social features)
-
-## Firebase Setup Required
-
-1. Create Firebase project at console.firebase.google.com
-2. Enable Authentication > Google provider
-3. Enable Firestore Database
-4. Enable Storage
-5. Add Firebase config to `.env.local`
-
-## Firestore Schema (Proposed)
+## Firestore Schema
 
 ```
 users/{userId}/photos/{date}
-  - frontPhotoUrl: string
-  - backPhotoUrl: string
+  - frontPhotoUrl: string | null
+  - backPhotoUrl: string | null
   - uploadedAt: timestamp
+
+users/{userId}/settings/shareLink
+  - token: string
+  - permissions: { showGraph: boolean, showPhotos: boolean }
+  - isActive: boolean
+
+shareLinks/{token}
+  - userId: string
+  - permissions: { showGraph: boolean, showPhotos: boolean }
+  - isActive: boolean
 ```
 
-## Storage Structure (Proposed)
+## Environment Variables
 
+Required in `.env.local`:
 ```
-photos/{userId}/{date}/front.jpg
-photos/{userId}/{date}/back.jpg
+NEXT_PUBLIC_FIREBASE_API_KEY
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+NEXT_PUBLIC_FIREBASE_PROJECT_ID
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+NEXT_PUBLIC_FIREBASE_APP_ID
+
+# For API routes (server-side Firebase Admin)
+FIREBASE_CLIENT_EMAIL
+FIREBASE_PRIVATE_KEY
 ```
