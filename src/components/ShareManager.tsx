@@ -185,6 +185,21 @@ export default function ShareManager() {
             />
             <span className="text-sm text-gray-700">Progress photos</span>
           </label>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={shareLink.permissions.showCompare ?? true}
+              onChange={(e) =>
+                handleUpdatePermissions({
+                  ...shareLink.permissions,
+                  showCompare: e.target.checked,
+                })
+              }
+              disabled={updating}
+              className="w-4 h-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
+            />
+            <span className="text-sm text-gray-700">Before/after comparison</span>
+          </label>
         </div>
       </div>
 

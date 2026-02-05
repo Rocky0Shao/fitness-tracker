@@ -4,6 +4,7 @@ import { db } from './firebase';
 export interface SharePermissions {
   showGraph: boolean;
   showPhotos: boolean;
+  showCompare: boolean;
 }
 
 export interface ShareLink {
@@ -48,7 +49,7 @@ export async function getOrCreateShareLink(userId: string): Promise<ShareLink> {
     token,
     odId: userId,
     createdAt: now,
-    permissions: { showGraph: true, showPhotos: true },
+    permissions: { showGraph: true, showPhotos: true, showCompare: true },
     isActive: false, // Disabled by default
   };
 
@@ -106,7 +107,7 @@ export async function regenerateShareToken(userId: string, oldToken: string): Pr
     token: newToken,
     odId: userId,
     createdAt: now,
-    permissions: existingData.permissions || { showGraph: true, showPhotos: true },
+    permissions: existingData.permissions || { showGraph: true, showPhotos: true, showCompare: true },
     isActive: false, // Reset to disabled when regenerating
   };
 

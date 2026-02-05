@@ -51,7 +51,7 @@ npm run lint     # Lint code
   - Click to view photos, double-click to edit
 - **ComparisonSlider** - Before/after photo comparison with draggable divider
 - **PrivacyImage** - Wrapper that applies blur based on PrivacyContext
-- **ShareManager** - UI for enabling/disabling share links and setting permissions
+- **ShareManager** - UI for enabling/disabling share links and setting permissions (showGraph, showPhotos, showCompare)
 - **UploadModal** - Modal for uploading photos to past dates (opened from heatmap clicks)
 
 ## Firestore Schema
@@ -64,12 +64,12 @@ users/{userId}/photos/{date}
 
 users/{userId}/settings/shareLink
   - token: string
-  - permissions: { showGraph: boolean, showPhotos: boolean }
+  - permissions: { showGraph: boolean, showPhotos: boolean, showCompare: boolean }
   - isActive: boolean
 
 shareLinks/{token}
   - userId: string
-  - permissions: { showGraph: boolean, showPhotos: boolean }
+  - permissions: { showGraph: boolean, showPhotos: boolean, showCompare: boolean }
   - isActive: boolean
 ```
 
@@ -94,8 +94,16 @@ FIREBASE_PRIVATE_KEY
 The share feature allows users to share their progress via a public URL:
 
 1. **Enable sharing** in the "Share Your Progress" section
-2. **Configure permissions**: activity heatmap and/or photos
+2. **Configure permissions**: activity heatmap, photos, and/or before/after comparison
 3. **Copy the link** to share with others
+
+### Share Page Features (`/share/[token]`)
+
+The shared page provides viewers with:
+- **Exercise Activity Heatmap** - GitHub-style heatmap with "X Days" count, year selector, click to view photos
+- **Photo Carousel** - Swiper-based carousel with thumbnail scrubber (same as main UI)
+- **Compare Function** - Viewers can select two dates and compare front/back photos with draggable slider
+- All features respect the owner's permission settings
 
 The share API (`/api/share/[token]`) uses Firebase Admin SDK, which requires `FIREBASE_CLIENT_EMAIL` and `FIREBASE_PRIVATE_KEY` to be set.
 

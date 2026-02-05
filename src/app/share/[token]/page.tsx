@@ -1,6 +1,14 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, useRef, useMemo } from 'react';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Navigation, Pagination, Thumbs, FreeMode } from 'swiper/modules';
+import type { Swiper as SwiperType } from 'swiper';
+import 'swiper/css';
+import 'swiper/css/navigation';
+import 'swiper/css/pagination';
+import 'swiper/css/thumbs';
+import 'swiper/css/free-mode';
 
 interface ShareEntry {
   date: string;
@@ -12,6 +20,7 @@ interface ShareData {
   permissions: {
     showGraph: boolean;
     showPhotos: boolean;
+    showCompare: boolean;
   };
   entries: ShareEntry[];
 }
@@ -72,15 +81,39 @@ function formatDate(dateStr: string): string {
   });
 }
 
-function SharedHeatmap({ entries, onDayClick }: { entries: ShareEntry[]; onDayClick?: (date: string) => void }) {
+function formatShortDate(dateStr: string): string {
+  const date = new Date(dateStr + 'T12:00:00');
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function SharedHeatmap({
+  entries,
+  onDayClick,
+  compareMode,
+  selectedDates,
+}: {
+  entries: ShareEntry[];
+  onDayClick?: (date: string) => void;
+  compareMode?: boolean;
+  selectedDates?: string[];
+}) {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
 
-  const workoutDates = new Set(
-    entries
-      .filter(e => e.frontPhotoUrl || e.backPhotoUrl)
-      .map(e => e.date)
-  );
+  const workoutDates = new Map<string, { front: boolean; back: boolean }>();
+  entries.forEach(e => {
+    if (e.frontPhotoUrl || e.backPhotoUrl) {
+      workoutDates.set(e.date, {
+        front: !!e.frontPhotoUrl,
+        back: !!e.backPhotoUrl,
+      });
+    }
+  });
+
+  const daysExercised = workoutDates.size;
 
   const years = Array.from(
     new Set([currentYear, ...entries.map(e => new Date(e.date).getFullYear())])
@@ -93,7 +126,9 @@ function SharedHeatmap({ entries, onDayClick }: { entries: ShareEntry[]; onDayCl
   return (
     <div className="bg-white rounded-2xl shadow-lg p-6">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-lg font-semibold text-gray-800">Exercise Activity</h2>
+        <h2 className="text-lg font-semibold text-gray-800">
+          Exercise Activity ({daysExercised} Days)
+        </h2>
         <div className="flex gap-2">
           {years.map(year => (
             <button
@@ -110,6 +145,14 @@ function SharedHeatmap({ entries, onDayClick }: { entries: ShareEntry[]; onDayCl
           ))}
         </div>
       </div>
+
+      {compareMode && (
+        <p className="text-sm text-blue-600 mb-4">
+          {selectedDates?.length === 0 && 'Click a date to select the "Before" photo'}
+          {selectedDates?.length === 1 && 'Click another date to select the "After" photo'}
+          {selectedDates?.length === 2 && 'Two dates selected - ready to compare!'}
+        </p>
+      )}
 
       <div className="overflow-x-auto">
         <div className="inline-block">
@@ -150,23 +193,30 @@ function SharedHeatmap({ entries, onDayClick }: { entries: ShareEntry[]; onDayCl
                       return <div key={dayIdx} className="w-3 h-3" />;
                     }
 
-                    const hasWorkout = workoutDates.has(dateStr);
+                    const workout = workoutDates.get(dateStr);
+                    const hasWorkout = !!workout;
+                    const hasBoth = workout?.front && workout?.back;
                     const isFuture = dateStr > today;
                     const isToday = dateStr === today;
+                    const isSelected = selectedDates?.includes(dateStr);
 
                     return (
                       <button
                         key={dayIdx}
                         onClick={() => onDayClick?.(dateStr)}
-                        disabled={isFuture || !hasWorkout}
-                        title={`${dateStr}${hasWorkout ? ' - Workout logged' : ''}`}
+                        disabled={isFuture || (!hasWorkout && !compareMode)}
+                        title={`${dateStr}${hasWorkout ? ` - ${hasBoth ? '2 photos' : '1 photo'}` : ''}`}
                         className={`w-3 h-3 rounded-sm transition-all ${
                           isFuture
                             ? 'bg-gray-50'
                             : hasWorkout
-                            ? 'bg-green-500 cursor-pointer hover:bg-green-600'
+                            ? hasBoth
+                              ? 'bg-green-500 cursor-pointer hover:bg-green-600'
+                              : 'bg-green-300 cursor-pointer hover:bg-green-400'
                             : 'bg-gray-200'
-                        } ${isToday ? 'ring-1 ring-blue-500 ring-offset-1' : ''}`}
+                        } ${isToday ? 'ring-1 ring-blue-500 ring-offset-1' : ''} ${
+                          isSelected ? 'ring-2 ring-purple-500 ring-offset-1' : ''
+                        }`}
                       />
                     );
                   })}
@@ -177,85 +227,452 @@ function SharedHeatmap({ entries, onDayClick }: { entries: ShareEntry[]; onDayCl
         </div>
       </div>
 
-      <div className="flex items-center justify-end gap-2 mt-4 text-xs text-gray-500">
-        <span>Less</span>
-        <div className="w-3 h-3 rounded-sm bg-gray-200" />
-        <div className="w-3 h-3 rounded-sm bg-green-300" />
-        <div className="w-3 h-3 rounded-sm bg-green-500" />
-        <span>More</span>
+      <div className="flex items-center justify-between mt-4">
+        <p className="text-xs text-gray-400">Click to view photos</p>
+        <div className="flex items-center gap-2 text-xs text-gray-500">
+          <span>Less</span>
+          <div className="w-3 h-3 rounded-sm bg-gray-200" />
+          <div className="w-3 h-3 rounded-sm bg-green-300" />
+          <div className="w-3 h-3 rounded-sm bg-green-500" />
+          <span>More</span>
+        </div>
       </div>
     </div>
   );
 }
 
-function SharedCarousel({ entries }: { entries: ShareEntry[] }) {
-  const [currentIndex, setCurrentIndex] = useState(0);
+function SharedPhotoCarousel({
+  entries,
+  onDateChange,
+  initialDate,
+}: {
+  entries: ShareEntry[];
+  onDateChange?: (date: string) => void;
+  initialDate?: string;
+}) {
+  const [thumbsSwiper, setThumbsSwiper] = useState<SwiperType | null>(null);
+  const [mainSwiper, setMainSwiper] = useState<SwiperType | null>(null);
 
   const entriesWithPhotos = entries.filter(e => e.frontPhotoUrl || e.backPhotoUrl);
 
+  useEffect(() => {
+    if (initialDate && mainSwiper) {
+      const index = entriesWithPhotos.findIndex((e) => e.date === initialDate);
+      if (index !== -1) {
+        mainSwiper.slideTo(index);
+      }
+    }
+  }, [initialDate, mainSwiper, entriesWithPhotos]);
+
   if (entriesWithPhotos.length === 0) {
     return (
-      <div className="text-center py-12 text-gray-500">
-        <p>No photos available.</p>
+      <div className="bg-white rounded-2xl shadow-lg p-6">
+        <div className="text-center py-8 text-gray-500">
+          <p className="text-sm">No photos available.</p>
+        </div>
       </div>
     );
   }
 
-  const entry = entriesWithPhotos[currentIndex];
-
   return (
     <div className="bg-white rounded-2xl shadow-lg p-6">
-      <h3 className="text-center text-lg font-semibold text-gray-800 mb-4">
-        {formatDate(entry.date)}
-      </h3>
-      <div className="flex gap-4 justify-center mb-4">
-        <div className="flex flex-col items-center">
-          <span className="text-xs text-gray-500 mb-2">Front</span>
-          {entry.frontPhotoUrl ? (
-            <img
-              src={entry.frontPhotoUrl}
-              alt="Front view"
-              className="w-36 h-48 object-cover rounded-lg shadow"
-            />
-          ) : (
-            <div className="w-36 h-48 bg-gray-100 rounded-lg flex items-center justify-center">
-              <span className="text-gray-400 text-sm">No photo</span>
-            </div>
-          )}
-        </div>
-        <div className="flex flex-col items-center">
-          <span className="text-xs text-gray-500 mb-2">Back</span>
-          {entry.backPhotoUrl ? (
-            <img
-              src={entry.backPhotoUrl}
-              alt="Back view"
-              className="w-36 h-48 object-cover rounded-lg shadow"
-            />
-          ) : (
-            <div className="w-36 h-48 bg-gray-100 rounded-lg flex items-center justify-center">
-              <span className="text-gray-400 text-sm">No photo</span>
-            </div>
-          )}
+      <h2 className="text-lg font-semibold text-gray-800 mb-4">Progress Photos</h2>
+      <div className="flex flex-col gap-3">
+        <Swiper
+          onSwiper={setMainSwiper}
+          modules={[Navigation, Pagination, Thumbs]}
+          navigation
+          pagination={{ clickable: true }}
+          thumbs={{ swiper: thumbsSwiper && !thumbsSwiper.destroyed ? thumbsSwiper : null }}
+          spaceBetween={16}
+          slidesPerView={1}
+          onSlideChange={(swiper) => {
+            const entry = entriesWithPhotos[swiper.activeIndex];
+            if (entry && onDateChange) {
+              onDateChange(entry.date);
+            }
+          }}
+          className="w-full"
+        >
+          {entriesWithPhotos.map((entry) => (
+            <SwiperSlide key={entry.date}>
+              <div className="pb-2">
+                <h3 className="text-center text-sm font-medium text-gray-600 mb-3">
+                  {formatDate(entry.date)}
+                </h3>
+                <div className="flex gap-3 justify-center">
+                  <div className="relative">
+                    {entry.frontPhotoUrl ? (
+                      <img
+                        src={entry.frontPhotoUrl}
+                        alt="Front view"
+                        className="w-28 h-36 object-cover rounded-lg shadow-sm"
+                      />
+                    ) : (
+                      <div className="w-28 h-36 bg-gray-100 rounded-lg flex items-center justify-center">
+                        <span className="text-gray-400 text-xs">No photo</span>
+                      </div>
+                    )}
+                    <span className="absolute bottom-1 left-1 text-[10px] bg-black/50 text-white px-1.5 py-0.5 rounded">Front</span>
+                  </div>
+                  <div className="relative">
+                    {entry.backPhotoUrl ? (
+                      <img
+                        src={entry.backPhotoUrl}
+                        alt="Back view"
+                        className="w-28 h-36 object-cover rounded-lg shadow-sm"
+                      />
+                    ) : (
+                      <div className="w-28 h-36 bg-gray-100 rounded-lg flex items-center justify-center">
+                        <span className="text-gray-400 text-xs">No photo</span>
+                      </div>
+                    )}
+                    <span className="absolute bottom-1 left-1 text-[10px] bg-black/50 text-white px-1.5 py-0.5 rounded">Back</span>
+                  </div>
+                </div>
+              </div>
+            </SwiperSlide>
+          ))}
+        </Swiper>
+
+        {/* Thumbnail scrubber */}
+        <Swiper
+          onSwiper={setThumbsSwiper}
+          modules={[FreeMode, Thumbs]}
+          spaceBetween={6}
+          slidesPerView="auto"
+          freeMode
+          watchSlidesProgress
+          className="w-full px-2"
+        >
+          {entriesWithPhotos.map((entry) => (
+            <SwiperSlide key={entry.date} className="!w-12">
+              <div className="cursor-pointer group">
+                {entry.frontPhotoUrl ? (
+                  <img
+                    src={entry.frontPhotoUrl}
+                    alt={formatShortDate(entry.date)}
+                    className="w-12 h-16 object-cover rounded border-2 border-transparent group-[.swiper-slide-thumb-active]:border-blue-500 transition-all"
+                  />
+                ) : (
+                  <div className="w-12 h-16 bg-gray-200 rounded border-2 border-transparent group-[.swiper-slide-thumb-active]:border-blue-500 flex items-center justify-center transition-all">
+                    <span className="text-[8px] text-gray-500 text-center leading-tight">
+                      {formatShortDate(entry.date)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </SwiperSlide>
+          ))}
+        </Swiper>
+      </div>
+    </div>
+  );
+}
+
+function ComparisonSlider({
+  beforeImage,
+  afterImage,
+  beforeLabel = 'Before',
+  afterLabel = 'After',
+}: {
+  beforeImage: string;
+  afterImage: string;
+  beforeLabel?: string;
+  afterLabel?: string;
+}) {
+  const [sliderPosition, setSliderPosition] = useState(50);
+  const [isDragging, setIsDragging] = useState(false);
+  const [containerWidth, setContainerWidth] = useState<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.offsetWidth);
+      }
+    };
+    updateWidth();
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, []);
+
+  const updateSliderPosition = (clientX: number) => {
+    if (!containerRef.current) return;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
+    setSliderPosition(percentage);
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+    updateSliderPosition(e.clientX);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setIsDragging(true);
+    updateSliderPosition(e.touches[0].clientX);
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDragging) {
+        updateSliderPosition(e.clientX);
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (isDragging) {
+        updateSliderPosition(e.touches[0].clientX);
+      }
+    };
+
+    const handleEnd = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleEnd);
+      document.addEventListener('touchmove', handleTouchMove);
+      document.addEventListener('touchend', handleEnd);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleEnd);
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleEnd);
+    };
+  }, [isDragging]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative w-full aspect-[3/4] max-w-md mx-auto rounded-xl overflow-hidden cursor-ew-resize select-none"
+      onMouseDown={handleMouseDown}
+      onTouchStart={handleTouchStart}
+    >
+      {/* After Image (Background) */}
+      <img
+        src={afterImage}
+        alt={afterLabel}
+        className="absolute inset-0 w-full h-full object-cover"
+        draggable={false}
+      />
+
+      {/* Before Image (Clipped) */}
+      <div
+        className="absolute inset-0 overflow-hidden"
+        style={{ width: `${sliderPosition}%` }}
+      >
+        <img
+          src={beforeImage}
+          alt={beforeLabel}
+          className="absolute inset-0 h-full object-cover"
+          style={{ width: containerWidth || '100%' }}
+          draggable={false}
+        />
+      </div>
+
+      {/* Slider Handle */}
+      <div
+        className="absolute top-0 bottom-0 w-1 bg-white shadow-lg cursor-ew-resize"
+        style={{ left: `${sliderPosition}%`, transform: 'translateX(-50%)' }}
+      >
+        {/* Handle Circle */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center">
+          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+          </svg>
         </div>
       </div>
-      <div className="flex justify-center gap-4">
-        <button
-          onClick={() => setCurrentIndex(i => Math.max(0, i - 1))}
-          disabled={currentIndex === 0}
-          className="px-4 py-2 bg-gray-100 rounded-lg disabled:opacity-50"
-        >
-          Previous
-        </button>
-        <span className="flex items-center text-sm text-gray-500">
-          {currentIndex + 1} / {entriesWithPhotos.length}
-        </span>
-        <button
-          onClick={() => setCurrentIndex(i => Math.min(entriesWithPhotos.length - 1, i + 1))}
-          disabled={currentIndex === entriesWithPhotos.length - 1}
-          className="px-4 py-2 bg-gray-100 rounded-lg disabled:opacity-50"
-        >
-          Next
-        </button>
+
+      {/* Labels */}
+      <div className="absolute top-3 left-3 px-2 py-1 bg-black/60 text-white text-xs rounded">
+        {beforeLabel}
+      </div>
+      <div className="absolute top-3 right-3 px-2 py-1 bg-black/60 text-white text-xs rounded">
+        {afterLabel}
+      </div>
+    </div>
+  );
+}
+
+function ComparisonModal({
+  isOpen,
+  entries,
+  onClose,
+}: {
+  isOpen: boolean;
+  entries: ShareEntry[];
+  onClose: () => void;
+}) {
+  const [beforeDate, setBeforeDate] = useState<string>('');
+  const [afterDate, setAfterDate] = useState<string>('');
+  const [viewType, setViewType] = useState<'front' | 'back'>('front');
+
+  // Filter entries that have photos for the selected view type
+  const entriesWithPhotos = useMemo(() => {
+    return entries.filter((e) =>
+      viewType === 'front' ? e.frontPhotoUrl : e.backPhotoUrl
+    );
+  }, [entries, viewType]);
+
+  // Compute default dates
+  const defaultAfterDate = entriesWithPhotos.length >= 1 ? entriesWithPhotos[0].date : '';
+  const defaultBeforeDate = entriesWithPhotos.length >= 2 ? entriesWithPhotos[entriesWithPhotos.length - 1].date : '';
+
+  // Use state values if set, otherwise use defaults
+  const effectiveBeforeDate = beforeDate || defaultBeforeDate;
+  const effectiveAfterDate = afterDate || defaultAfterDate;
+
+  // Reset state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setBeforeDate('');
+      setAfterDate('');
+    }
+  }, [isOpen]);
+
+  // Handle escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = '';
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  const beforeEntry = entries.find((e) => e.date === effectiveBeforeDate);
+  const afterEntry = entries.find((e) => e.date === effectiveAfterDate);
+
+  const beforeImage = viewType === 'front' ? beforeEntry?.frontPhotoUrl : beforeEntry?.backPhotoUrl;
+  const afterImage = viewType === 'front' ? afterEntry?.frontPhotoUrl : afterEntry?.backPhotoUrl;
+
+  const canCompare = beforeImage && afterImage && effectiveBeforeDate !== effectiveAfterDate;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <div
+        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between rounded-t-2xl">
+          <h2 className="text-lg font-semibold text-gray-800">Compare Progress</h2>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+          >
+            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {entriesWithPhotos.length < 2 ? (
+            <div className="text-center py-12 text-gray-500">
+              <p>Need at least 2 photos to compare progress.</p>
+            </div>
+          ) : (
+            <>
+              {/* View Type Toggle */}
+              <div className="flex justify-center gap-2">
+                <button
+                  onClick={() => setViewType('front')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    viewType === 'front'
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  Front View
+                </button>
+                <button
+                  onClick={() => setViewType('back')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    viewType === 'back'
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  Back View
+                </button>
+              </div>
+
+              {/* Date Selectors */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                    Before (Start Date)
+                  </label>
+                  <select
+                    value={effectiveBeforeDate}
+                    onChange={(e) => setBeforeDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    {entriesWithPhotos.map((entry) => (
+                      <option key={entry.date} value={entry.date} disabled={entry.date === effectiveAfterDate}>
+                        {formatDate(entry.date)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
+                    After (Current)
+                  </label>
+                  <select
+                    value={effectiveAfterDate}
+                    onChange={(e) => setAfterDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    {entriesWithPhotos.map((entry) => (
+                      <option key={entry.date} value={entry.date} disabled={entry.date === effectiveBeforeDate}>
+                        {formatDate(entry.date)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Comparison Slider */}
+              {canCompare ? (
+                <ComparisonSlider
+                  beforeImage={beforeImage}
+                  afterImage={afterImage}
+                  beforeLabel={formatDate(effectiveBeforeDate)}
+                  afterLabel={formatDate(effectiveAfterDate)}
+                />
+              ) : (
+                <div className="aspect-[3/4] max-w-md mx-auto bg-gray-100 rounded-xl flex items-center justify-center">
+                  <p className="text-gray-500 text-sm">Select different dates to compare</p>
+                </div>
+              )}
+
+              <p className="text-center text-xs text-gray-400">
+                Drag the slider to reveal your transformation
+              </p>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -267,6 +684,7 @@ export default function SharePage({ params }: { params: Promise<{ token: string 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [showCompare, setShowCompare] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -322,30 +740,49 @@ export default function SharePage({ params }: { params: Promise<{ token: string 
     ? data.entries.find(e => e.date === selectedDate)
     : null;
 
+  const hasPhotos = data.entries.some(e => e.frontPhotoUrl || e.backPhotoUrl);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <header className="bg-white shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <h1 className="text-xl font-bold text-gray-800">FitSnap</h1>
-          <a
-            href="/"
-            className="px-4 py-2 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition-colors"
-          >
-            Start Your Journey
-          </a>
+          <div className="flex items-center gap-3">
+            {data.permissions.showCompare && data.permissions.showPhotos && hasPhotos && (
+              <button
+                onClick={() => setShowCompare(!showCompare)}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  showCompare
+                    ? 'bg-purple-500 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                Compare
+              </button>
+            )}
+            <a
+              href="/"
+              className="px-4 py-2 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              Start Your Journey
+            </a>
+          </div>
         </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-        {data.permissions.showGraph && (
-          <SharedHeatmap
-            entries={data.entries}
-            onDayClick={data.permissions.showPhotos ? handleDayClick : undefined}
-          />
-        )}
+        {/* Comparison Modal */}
+        <ComparisonModal
+          isOpen={showCompare && data.permissions.showCompare && data.permissions.showPhotos}
+          entries={data.entries}
+          onClose={() => setShowCompare(false)}
+        />
 
         {data.permissions.showPhotos && !selectedDate && (
-          <SharedCarousel entries={data.entries} />
+          <SharedPhotoCarousel
+            entries={data.entries}
+            onDateChange={(date) => setSelectedDate(null)}
+          />
         )}
 
         {data.permissions.showPhotos && selectedEntry && (
@@ -356,7 +793,7 @@ export default function SharePage({ params }: { params: Promise<{ token: string 
               </h3>
               <button
                 onClick={() => setSelectedDate(null)}
-                className="text-sm text-gray-500 hover:text-gray-700"
+                className="text-sm text-blue-500 hover:text-blue-700"
               >
                 Back to carousel
               </button>
@@ -392,6 +829,13 @@ export default function SharePage({ params }: { params: Promise<{ token: string 
               </div>
             </div>
           </div>
+        )}
+
+        {data.permissions.showGraph && (
+          <SharedHeatmap
+            entries={data.entries}
+            onDayClick={data.permissions.showPhotos ? handleDayClick : undefined}
+          />
         )}
 
         {!data.permissions.showGraph && !data.permissions.showPhotos && (

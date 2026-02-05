@@ -59,13 +59,13 @@ export async function GET(
 
     const { userId, permissions } = linkData;
     const response: {
-      permissions: { showGraph: boolean; showPhotos: boolean };
+      permissions: { showGraph: boolean; showPhotos: boolean; showCompare: boolean };
       entries?: Array<{
         date: string;
         frontPhotoUrl: string | null;
         backPhotoUrl: string | null;
       }>;
-    } = { permissions };
+    } = { permissions: { ...permissions, showCompare: permissions.showCompare ?? true } };
 
     const photosSnapshot = await db
       .collection('users')
